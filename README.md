@@ -28,6 +28,34 @@ python llm_benchmark_api.py
 uvicorn llm_benchmark_api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+## Locust 부하 테스트
+
+Locust로 `/benchmark` 엔드포인트 동시 호출을 조절할 수 있습니다. `num_requests`는 `/benchmark` 1회 호출 시 내부에서 병렬로 실행하는 LLM 요청 수이므로, Locust 유저 수와 곱해져 부하가 커질 수 있습니다.
+
+### 설치
+
+```bash
+pip install -r requirements.txt
+```
+
+### 실행 예시
+
+```bash
+export BENCHMARK_API_ENDPOINT="https://api.openai.com"
+export BENCHMARK_API_KEY="your-api-key"
+export BENCHMARK_MODEL_NAME="gpt-3.5-turbo"
+export BENCHMARK_NUM_REQUESTS="1"
+
+locust -f locustfile.py --host http://localhost:8000
+```
+
+옵션 설정:
+
+- `BENCHMARK_NUM_REQUESTS`: `/benchmark` 내부에서 동시에 실행할 요청 수 (기본값: 1)
+- `BENCHMARK_TEST_PROMPTS`: `||`로 구분된 테스트 프롬프트 목록
+- `BENCHMARK_USE_VISION`: `true`/`false`
+- `BENCHMARK_VISION_TESTSET_PATH`: 비전 테스트셋 경로 (기본값: `data/vision_testset.jsonl`)
+
 ## API 사용 예제
 
 `api_endpoint`에는 base URL을 넣으면 `/v1/chat/completions`로 자동 보정됩니다.
