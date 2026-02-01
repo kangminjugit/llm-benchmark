@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LLM Benchmark UI</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+      background: #f7f9fc;
+      color: #1a202c;
+    }
+
+    body {
+      margin: 0;
+      padding: 32px 20px 64px;
+    }
+
+    header {
+      max-width: 980px;
+      margin: 0 auto 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    p {
+      margin: 0;
+      color: #4a5568;
+    }
+
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      display: grid;
+      gap: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    section {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 20px 24px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    }
+
+    section h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      padding: 10px 12px;
+      font-size: 14px;
+      margin-bottom: 14px;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .row > div {
+      flex: 1 1 160px;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-weight: 600;
+      background: #2563eb;
+      color: #fff;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    button:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: -8px;
+      margin-bottom: 12px;
+    }
+
+    .status {
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      margin-bottom: 12px;
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    .status.error {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .status.success {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    th {
+      background: #f8fafc;
+      font-weight: 600;
+    }
+
+    .grid-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .metric-card {
+      padding: 12px;
+      border-radius: 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .metric-card span {
+      display: block;
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+
+    .metric-card strong {
+      font-size: 16px;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 12px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>LLM Benchmark UI</h1>
+    <p>FastAPI /benchmark 엔드포인트를 손쉽게 호출하고 결과를 확인하세요.</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>요청 설정</h2>
+      <label for="apiEndpoint">API 엔드포인트</label>
+      <input id="apiEndpoint" type="text" value="https://api.openai.com" />
+      <div class="hint">예: https://api.openai.com 또는 https://api.openai.com/v1/chat/completions</div>
+
+      <label for="apiKey">API 키</label>
+      <input id="apiKey" type="password" placeholder="sk-..." />
+
+      <label for="modelName">모델 이름</label>
+      <input id="modelName" type="text" value="gpt-4o-mini" />
+
+      <div class="row">
+        <div>
+          <label for="numRequests">요청 수</label>
+          <input id="numRequests" type="number" min="1" max="100" value="5" />
+        </div>
+        <div>
+          <label for="useVision">비전 사용</label>
+          <select id="useVision">
+            <option value="false" selected>아니오</option>
+            <option value="true">예</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="visionPath">비전 테스트셋 경로</label>
+      <input id="visionPath" type="text" value="data/vision_testset.jsonl" />
+
+      <label for="prompts">테스트 프롬프트 (한 줄에 하나씩)</label>
+      <textarea id="prompts" placeholder="프롬프트가 비어 있으면 기본 프롬프트를 사용합니다."></textarea>
+
+      <button id="runButton">벤치마크 실행</button>
+    </section>
+
+    <section>
+      <h2>결과</h2>
+      <div id="status" class="status">대기 중입니다.</div>
+      <div id="summary" class="grid-metrics"></div>
+
+      <h3>개별 요청 결과</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>성공</th>
+            <th>지연 시간(s)</th>
+            <th>토큰/초</th>
+            <th>에러</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+          <tr><td colspan="5">아직 결과가 없습니다.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>원본 응답</h3>
+      <pre id="rawOutput">응답이 여기에 표시됩니다.</pre>
+    </section>
+  </main>
+
+  <script>
+    const runButton = document.getElementById("runButton");
+    const statusEl = document.getElementById("status");
+    const summaryEl = document.getElementById("summary");
+    const resultsBody = document.getElementById("resultsBody");
+    const rawOutput = document.getElementById("rawOutput");
+
+    function setStatus(message, type = "") {
+      statusEl.textContent = message;
+      statusEl.className = `status ${type}`.trim();
+    }
+
+    function formatNumber(value, digits = 2) {
+      if (typeof value !== "number") return "-";
+      return value.toFixed(digits);
+    }
+
+    function renderSummary(metrics) {
+      summaryEl.innerHTML = "";
+      const cards = [
+        ["요청 수", metrics.total_requests],
+        ["성공률(%)", formatNumber(metrics.success_rate, 1)],
+        ["평균 지연(s)", formatNumber(metrics.average_latency, 2)],
+        ["P95 지연(s)", formatNumber(metrics.p95_latency, 2)],
+        ["평균 토큰/초", formatNumber(metrics.average_tokens_per_second, 2)],
+        ["초당 요청", formatNumber(metrics.requests_per_second, 2)]
+      ];
+
+      cards.forEach(([label, value]) => {
+        const card = document.createElement("div");
+        card.className = "metric-card";
+        card.innerHTML = `<span>${label}</span><strong>${value ?? "-"}</strong>`;
+        summaryEl.appendChild(card);
+      });
+    }
+
+    function renderResults(results) {
+      resultsBody.innerHTML = "";
+      if (!results || results.length === 0) {
+        resultsBody.innerHTML = '<tr><td colspan="5">결과가 없습니다.</td></tr>';
+        return;
+      }
+
+      results.forEach((item, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${item.success ? "✅" : "❌"}</td>
+          <td>${formatNumber(item.latency, 2)}</td>
+          <td>${formatNumber(item.tokens_per_second, 2)}</td>
+          <td>${item.error ?? "-"}</td>
+        `;
+        resultsBody.appendChild(row);
+      });
+    }
+
+    runButton.addEventListener("click", async () => {
+      runButton.disabled = true;
+      setStatus("벤치마크 실행 중...", "");
+      renderResults([]);
+      summaryEl.innerHTML = "";
+      rawOutput.textContent = "요청 중...";
+
+      const prompts = document
+        .getElementById("prompts")
+        .value.split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      const payload = {
+        api_endpoint: document.getElementById("apiEndpoint").value.trim(),
+        api_key: document.getElementById("apiKey").value.trim(),
+        model_name: document.getElementById("modelName").value.trim(),
+        num_requests: Number(document.getElementById("numRequests").value),
+        use_vision: document.getElementById("useVision").value === "true",
+        vision_testset_path: document.getElementById("visionPath").value.trim(),
+        test_prompts: prompts.length > 0 ? prompts : null
+      };
+
+      try {
+        const response = await fetch("/benchmark", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        rawOutput.textContent = JSON.stringify(data, null, 2);
+
+        if (!response.ok) {
+          setStatus(`요청 실패: ${data.detail ?? "알 수 없는 오류"}`, "error");
+          return;
+        }
+
+        setStatus("완료되었습니다!", "success");
+        renderSummary(data.metrics || {});
+        renderResults(data.individual_results || []);
+      } catch (error) {
+        setStatus(`네트워크 오류: ${error.message}`, "error");
+        rawOutput.textContent = String(error);
+      } finally {
+        runButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
