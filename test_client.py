@@ -15,7 +15,9 @@ class BenchmarkClient:
         api_key: str,
         model_name: str,
         test_prompts: list = None,
-        num_requests: int = 10
+        num_requests: int = 10,
+        use_vision: bool = False,
+        vision_testset_path: str = None,
     ) -> Dict[str, Any]:
         """벤치마크 실행"""
         
@@ -28,6 +30,10 @@ class BenchmarkClient:
         
         if test_prompts:
             payload["test_prompts"] = test_prompts
+        if use_vision:
+            payload["use_vision"] = True
+            if vision_testset_path:
+                payload["vision_testset_path"] = vision_testset_path
         
         response = requests.post(
             f"{self.base_url}/benchmark",
@@ -151,6 +157,23 @@ def compare_models():
                   f"{metrics['average_tokens_per_second']:.2f}{'':<8} "
                   f"{metrics['success_rate']:.1f}%")
 
+def example_vision():
+    """비전 모델 벤치마크 예제"""
+    client = BenchmarkClient()
+
+    print("Vision 모델 벤치마크를 실행합니다...")
+
+    result = client.run_benchmark(
+        api_endpoint="https://api.openai.com/v1/chat/completions",
+        api_key="your-api-key-here",
+        model_name="gpt-4o-mini",
+        num_requests=3,
+        use_vision=True,
+        vision_testset_path="data/vision_testset.jsonl",
+    )
+
+    client.print_results(result)
+
 if __name__ == "__main__":
     print("LLM Benchmark 테스트 클라이언트\n")
     
@@ -158,6 +181,7 @@ if __name__ == "__main__":
     # example_openai()
     # example_custom_prompts()
     # compare_models()
+    # example_vision()
     
     print("사용 방법:")
     print("1. llm_benchmark_api.py를 먼저 실행하세요")

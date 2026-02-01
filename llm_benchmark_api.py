@@ -1,10 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 import time
 import asyncio
 from datetime import datetime
 import statistics
+import json
+import random
+from pathlib import Path
 
 app = FastAPI(
     title="LLM Benchmark API",
@@ -18,6 +21,8 @@ class ModelRequest(BaseModel):
     model_name: str
     test_prompts: Optional[List[str]] = None
     num_requests: Optional[int] = 10
+    use_vision: Optional[bool] = False
+    vision_testset_path: Optional[str] = "data/vision_testset.jsonl"
     
 class BenchmarkResponse(BaseModel):
     model_name: str
@@ -39,6 +44,7 @@ class LLMBenchmark:
             "머신러닝과 딥러닝의 차이점을 설명해주세요.",
             "블록체인 기술의 원리를 간단히 설명해주세요."
         ]
+        self.default_vision_prompt = "이미지를 간단히 설명해주세요."
 
     @staticmethod
     def _normalize_chat_completions_endpoint(api_endpoint: str) -> str:
@@ -50,7 +56,12 @@ class LLMBenchmark:
             return f"{endpoint}/chat/completions"
         return f"{endpoint}/v1/chat/completions"
     
-    async def make_api_call(self, prompt: str) -> Dict[str, Any]:
+    async def make_api_call(
+        self,
+        prompt: str,
+        image_base64: Optional[str] = None,
+        mime_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """API 호출 및 응답 시간 측정"""
         import httpx
         
@@ -59,6 +70,20 @@ class LLMBenchmark:
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 # OpenAI 호환 API 형식 사용
+                message_content: Any
+                if image_base64 and mime_type:
+                    message_content = [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_base64}"
+                            },
+                        },
+                    ]
+                else:
+                    message_content = prompt
+
                 response = await client.post(
                     self.api_endpoint,
                     headers={
@@ -68,7 +93,7 @@ class LLMBenchmark:
                     json={
                         "model": self.model_name,
                         "messages": [
-                            {"role": "user", "content": prompt}
+                            {"role": "user", "content": message_content}
                         ],
                         "max_tokens": 500
                     }
@@ -121,21 +146,61 @@ class LLMBenchmark:
                 "error": str(e)
             }
     
-    async def run_benchmark(self, prompts: List[str], num_requests: int) -> Dict[str, Any]:
+    def _load_vision_dataset(self, dataset_path: str) -> List[Dict[str, str]]:
+        dataset_file = Path(dataset_path)
+        if not dataset_file.exists():
+            raise FileNotFoundError(f"Vision testset not found: {dataset_path}")
+
+        samples: List[Dict[str, str]] = []
+        with dataset_file.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                data = json.loads(line)
+                if all(key in data for key in ("prompt", "image_base64", "mime_type")):
+                    samples.append(data)
+
+        if not samples:
+            raise ValueError("Vision testset is empty or invalid")
+
+        return samples
+
+    async def run_benchmark(
+        self,
+        prompts: List[str],
+        num_requests: int,
+        use_vision: bool = False,
+        vision_testset_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """벤치마크 실행"""
-        
+
         # 사용할 프롬프트 결정
         test_prompts = prompts if prompts else self.default_prompts
-        
+
+        vision_samples: List[Dict[str, str]] = []
+        if use_vision:
+            vision_samples = self._load_vision_dataset(
+                vision_testset_path or "data/vision_testset.jsonl"
+            )
+
         # 반복 실행을 위한 프롬프트 리스트 생성
-        all_prompts = []
+        all_inputs: List[Tuple[str, Optional[str], Optional[str]]] = []
         for i in range(num_requests):
-            all_prompts.append(test_prompts[i % len(test_prompts)])
-        
+            if use_vision:
+                sample = random.choice(vision_samples)
+                prompt = sample.get("prompt") or self.default_vision_prompt
+                all_inputs.append(
+                    (prompt, sample["image_base64"], sample["mime_type"])
+                )
+            else:
+                all_inputs.append((test_prompts[i % len(test_prompts)], None, None))
+
         # 모든 요청 동시 실행
-        print(f"총 {len(all_prompts)}개의 요청 실행 중...")
+        print(f"총 {len(all_inputs)}개의 요청 실행 중...")
         results = await asyncio.gather(*[
-            self.make_api_call(prompt) for prompt in all_prompts
+            self.make_api_call(prompt, image_base64, mime_type)
+            for prompt, image_base64, mime_type in all_inputs
         ])
         
         # 성공한 결과만 필터링
@@ -210,6 +275,8 @@ async def run_benchmark(request: ModelRequest):
     - model_name: 모델 이름 (예: gpt-3.5-turbo)
     - test_prompts: 테스트용 프롬프트 리스트 (선택사항)
     - num_requests: 실행할 요청 수 (기본값: 10)
+    - use_vision: 비전 모델 벤치마크 여부 (기본값: False)
+    - vision_testset_path: 비전 테스트셋 jsonl 경로 (기본값: data/vision_testset.jsonl)
     
     Returns:
     - 벤치마크 지표 및 개별 결과
@@ -223,7 +290,9 @@ async def run_benchmark(request: ModelRequest):
         
         result = await benchmark.run_benchmark(
             prompts=request.test_prompts,
-            num_requests=request.num_requests
+            num_requests=request.num_requests,
+            use_vision=request.use_vision or False,
+            vision_testset_path=request.vision_testset_path,
         )
         
         return BenchmarkResponse(

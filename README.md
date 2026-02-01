@@ -8,6 +8,7 @@ LLM 모델의 성능 벤치마크를 측정하는 FastAPI 애플리케이션입�
 - **처리량 (Throughput)**: 초당 토큰 수, 초당 요청 수
 - **성공률**: 전체 요청 대비 성공한 요청의 비율
 - **토큰 사용량**: 총 토큰 수, 요청당 평균 토큰 수
+- **비전 모델 지원**: base64 이미지 테스트셋을 랜덤 샘플링하여 벤치마크
 
 ## 설치 방법
 
@@ -94,6 +95,23 @@ result = response.json()
 print(f"평균 지연 시간: {result['metrics']['average_latency']:.2f}초")
 print(f"초당 토큰 수: {result['metrics']['average_tokens_per_second']:.2f}")
 print(f"성공률: {result['metrics']['success_rate']:.2f}%")
+```
+
+### 5. 비전 모델 벤치마크
+
+`data/vision_testset.jsonl`에 base64 이미지가 저장되어 있으며, 요청 시 랜덤으로 샘플링합니다.
+
+```bash
+curl -X POST "http://localhost:8000/benchmark" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api_endpoint": "https://api.openai.com",
+    "api_key": "your-api-key",
+    "model_name": "gpt-4o-mini",
+    "num_requests": 5,
+    "use_vision": true,
+    "vision_testset_path": "data/vision_testset.jsonl"
+  }'
 ```
 
 ## 응답 예제
