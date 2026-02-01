@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List, Tuple
 import time
@@ -14,6 +15,9 @@ app = FastAPI(
     description="API endpoint로 LLM 모델의 성능 벤치마크를 측정합니다",
     version="1.0.0"
 )
+
+BASE_DIR = Path(__file__).resolve().parent
+UI_PATH = BASE_DIR / "ui" / "index.html"
 
 class ModelRequest(BaseModel):
     api_endpoint: str
@@ -255,9 +259,18 @@ async def root():
         "message": "LLM Benchmark API",
         "endpoints": {
             "/benchmark": "POST - 벤치마크 실행",
-            "/health": "GET - 헬스 체크"
+            "/health": "GET - 헬스 체크",
+            "/ui": "GET - 벤치마크 실행 UI"
         }
     }
+
+
+@app.get("/ui", response_class=HTMLResponse)
+async def benchmark_ui():
+    """벤치마크 실행 UI"""
+    if not UI_PATH.exists():
+        raise HTTPException(status_code=500, detail="UI file not found")
+    return HTMLResponse(UI_PATH.read_text(encoding="utf-8"))
 
 @app.get("/health")
 async def health_check():
