@@ -29,7 +29,7 @@ class LLMBenchmark:
     """LLM 모델 벤치마크 측정 클래스"""
     
     def __init__(self, api_endpoint: str, api_key: str, model_name: str):
-        self.api_endpoint = api_endpoint
+        self.api_endpoint = self._normalize_chat_completions_endpoint(api_endpoint)
         self.api_key = api_key
         self.model_name = model_name
         self.default_prompts = [
@@ -39,6 +39,16 @@ class LLMBenchmark:
             "머신러닝과 딥러닝의 차이점을 설명해주세요.",
             "블록체인 기술의 원리를 간단히 설명해주세요."
         ]
+
+    @staticmethod
+    def _normalize_chat_completions_endpoint(api_endpoint: str) -> str:
+        """Chat Completions API 엔드포인트로 정규화"""
+        endpoint = api_endpoint.rstrip("/")
+        if endpoint.endswith("/v1/chat/completions") or endpoint.endswith("/chat/completions"):
+            return endpoint
+        if endpoint.endswith("/v1"):
+            return f"{endpoint}/chat/completions"
+        return f"{endpoint}/v1/chat/completions"
     
     async def make_api_call(self, prompt: str) -> Dict[str, Any]:
         """API 호출 및 응답 시간 측정"""
@@ -195,7 +205,7 @@ async def run_benchmark(request: ModelRequest):
     LLM 모델 벤치마크 실행
     
     Parameters:
-    - api_endpoint: LLM API 엔드포인트 (예: https://api.openai.com/v1/chat/completions)
+    - api_endpoint: LLM API base URL 또는 Chat Completions 엔드포인트 (예: https://api.openai.com 또는 https://api.openai.com/v1/chat/completions)
     - api_key: API 키
     - model_name: 모델 이름 (예: gpt-3.5-turbo)
     - test_prompts: 테스트용 프롬프트 리스트 (선택사항)

@@ -29,13 +29,15 @@ uvicorn llm_benchmark_api:app --host 0.0.0.0 --port 8000 --reload
 
 ## API 사용 예제
 
+`api_endpoint`에는 base URL을 넣으면 `/v1/chat/completions`로 자동 보정됩니다.
+
 ### 1. OpenAI API 벤치마크
 
 ```bash
 curl -X POST "http://localhost:8000/benchmark" \
   -H "Content-Type: application/json" \
   -d '{
-    "api_endpoint": "https://api.openai.com/v1/chat/completions",
+    "api_endpoint": "https://api.openai.com",
     "api_key": "your-openai-api-key",
     "model_name": "gpt-3.5-turbo",
     "num_requests": 10
@@ -48,7 +50,7 @@ curl -X POST "http://localhost:8000/benchmark" \
 curl -X POST "http://localhost:8000/benchmark" \
   -H "Content-Type: application/json" \
   -d '{
-    "api_endpoint": "https://api.anthropic.com/v1/messages",
+    "api_endpoint": "https://api.anthropic.com",
     "api_key": "your-anthropic-api-key",
     "model_name": "claude-3-sonnet-20240229",
     "num_requests": 10
@@ -61,7 +63,7 @@ curl -X POST "http://localhost:8000/benchmark" \
 curl -X POST "http://localhost:8000/benchmark" \
   -H "Content-Type: application/json" \
   -d '{
-    "api_endpoint": "https://api.openai.com/v1/chat/completions",
+    "api_endpoint": "https://api.openai.com",
     "api_key": "your-api-key",
     "model_name": "gpt-4",
     "test_prompts": [
@@ -81,7 +83,7 @@ import requests
 response = requests.post(
     "http://localhost:8000/benchmark",
     json={
-        "api_endpoint": "https://api.openai.com/v1/chat/completions",
+        "api_endpoint": "https://api.openai.com",
         "api_key": "your-api-key",
         "model_name": "gpt-3.5-turbo",
         "num_requests": 10
